@@ -6,21 +6,43 @@ import validator from "validator";
 // login user
 
 const loginUser = async (req, res) => {
+  console.log("Login attempt for email:", req.body.email);
+  console.log("JWT_SECRET available:", !!process.env.JWT_SECRET);
+  console.log("MONGODB_URI available:", !!process.env.MONGODB_URI);
   const { email, password } = req.body;
+  
+  if (!process.env.JWT_SECRET) {
+    console.error("JWT_SECRET still missing in userController");
+    return res.json({ success: false, message: "Server configuration error - JWT missing" });
+  }
+  
   try {
     const user = await userModel.findOne({ email });
     if (!user) {
+      console.log("User not found:", email);
       return res.json({ success: false, message: "User Doesn't exist" });
     }
     const isMatch =await bcrypt.compare(password, user.password);
     if (!isMatch) {
+      console.log("Password mismatch for:", email);
       return res.json({ success: false, message: "Invalid Credentials" });
     }
     const role=user.role;
     const token = createToken(user._id);
-    res.json({ success: true, token,role });
+    console.log("Login successful for:", email);
+    res.json({ 
+      success: true, 
+      token,
+      role,
+      user: {
+        name: user.name,
+        email: user.email,
+        role: user.role
+      },
+      message: "Login successful!"
+    });
   } catch (error) {
-    console.log(error);
+    console.error("Login error:", error);
     res.json({ success: false, message: "Error" });
   }
 };

@@ -13,6 +13,7 @@ const LoginPopup = ({ setShowLogin }) => {
     email: "",
     password: "",
   });
+  const [isLoading, setIsLoading] = useState(false);
 
   const onChangeHandler = (event) => {
     const name = event.target.name;
@@ -22,22 +23,90 @@ const LoginPopup = ({ setShowLogin }) => {
 
   const onLogin = async (event) => {
     event.preventDefault();
+    setIsLoading(true);
+    
     let newUrl = url;
     if (currentState === "Login") {
       newUrl += "/api/user/login";
     } else {
       newUrl += "/api/user/register";
     }
-    const response = await axios.post(newUrl, data);
-    if (response.data.success) {
-      setToken(response.data.token);
-      localStorage.setItem("token", response.data.token);
-      toast.success("Login Successfully")
-      setShowLogin(false);
-    }else{
-      toast.error(response.data.message);
+    
+    // Validate input before sending
+    if (!data.email || !data.password) {
+      toast.error("Please fill in all fields");
+      setIsLoading(false);
+      return;
+    }
+    
+    if (currentState === "Sign Up" && !data.name) {
+      toast.error("Please enter your name");
+      setIsLoading(false);
+      return;
+    }
+    
+    try {
+      console.log("=== LOGIN ATTEMPT ===");
+      console.log("URL:", newUrl);
+      console.log("Data:", data);
+      console.log("Current State:", currentState);
+      
+      const response = await axios.post(newUrl, data);
+      console.log("=== RESPONSE RECEIVED ===");
+      console.log("Status:", response.status);
+      console.log("Data:", response.data);
+      
+      if (response.data.success) {
+        console.log("=== LOGIN SUCCESS ===");
+        console.log("User email:", data.email);
+        console.log("Token received:", response.data.token);
+        
+        setToken(response.data.token);
+        localStorage.setItem("token", response.data.token);
+        
+        // Show success message with email
+        const successMessage = currentState === "Login" 
+          ? `Login Successful! Welcome ${data.email}!`
+          : `Account Created Successfully! Welcome ${data.email}!`;
+        
+        toast.success(successMessage);
+        setShowLogin(false);
+        
+        // Reset form after successful login
+        setTimeout(() => {
+          setData({ name: "", email: "", password: "" });
+        }, 1000);
+        
+        console.log("=== LOGIN PROCESS COMPLETED ===");
+      } else {
+        console.log("=== LOGIN FAILED (Backend) ===");
+        console.log("Error Message:", response.data.message);
+        toast.error(response.data.message || "Login failed");
+      }
+    } catch (error) {
+      console.error("=== LOGIN ERROR (Frontend) ===");
+      console.error("Full Error:", error);
+      
+      if (error.response) {
+        console.error("=== SERVER RESPONDED WITH ERROR ===");
+        console.error("Status:", error.response.status);
+        console.error("Data:", error.response.data);
+        console.error("Headers:", error.response.headers);
+        toast.error(error.response.data.message || `Server error: ${error.response.status}`);
+      } else if (error.request) {
+        console.error("=== NO RESPONSE FROM SERVER ===");
+        console.error("Request:", error.request);
+        toast.error("Cannot connect to server. Is backend running on port 4000?");
+      } else {
+        console.error("=== REQUEST SETUP ERROR ===");
+        console.error("Message:", error.message);
+        toast.error("Request failed: " + error.message);
+      }
+    } finally {
+      setIsLoading(false);
     }
   };
+
   return (
     <div className="login-popup">
       <form onSubmit={onLogin} className="login-popup-container">
@@ -79,8 +148,8 @@ const LoginPopup = ({ setShowLogin }) => {
             required
           />
         </div>
-        <button type="submit">
-          {currentState === "Sign Up" ? "Create Account" : "Login"}
+        <button type="submit" disabled={isLoading}>
+          {isLoading ? "Processing..." : (currentState === "Sign Up" ? "Create Account" : "Login")}
         </button>
         <div className="login-popup-condition">
           <input type="checkbox" required />
